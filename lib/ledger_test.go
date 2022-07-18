@@ -1,8 +1,10 @@
-package main
+package ledger_test
 
 import (
 	"bytes"
 	"testing"
+
+	ledger "github.com/hirosato/ledger/lib"
 )
 
 func TestLedger(t *testing.T) {
@@ -15,7 +17,7 @@ func TestLedger(t *testing.T) {
   Expense:Food 200
   Assets:Cash -200
 `)
-	ledger, _ := ParseLedger(testLedger)
+	ledger, _ := ledger.ParseLedger(testLedger)
 	if len(ledger) != 2 {
 		t.Error("There should be 2 ledgers")
 	}
