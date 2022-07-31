@@ -2,14 +2,16 @@ package ledger
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
+
+	"github.com/araddon/dateparse"
+	"github.com/shopspring/decimal"
 )
 
 type TransactionItem struct {
 	Account Account
-	Amount  float64
+	Amount  decimal.Decimal
 	Comment string
 }
 
@@ -41,19 +43,20 @@ func (lines Lines) body() []Line {
 func parseHeader(lines *Lines) (date time.Time, payee string, err error) {
 	header := lines.header()
 	dateAndPayee := strings.SplitN(header.s, " ", 2)
-	date, err = time.Parse("2006-01-02", dateAndPayee[0])
+	date, err = dateparse.ParseAny(dateAndPayee[0])
 	if err != nil {
 		return time.Time{}, "", fmt.Errorf("%d: Could not parse transaction header: %s", header.n, header.s)
 	}
+	date = time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, time.UTC)
 	return date, dateAndPayee[1], nil
 }
 
-func parseBodyLine(body Line) (account string, amount float64, comment string, err error) {
+func parseBodyLine(body Line) (account string, amount decimal.Decimal, comment string, err error) {
 	accountAndAmount, comment, _ := strings.Cut(body.s, ";")
 	account, sAmount, _ := strings.Cut(strings.TrimLeft(accountAndAmount, " "), "  ")
-	amount, err = strconv.ParseFloat(strings.Trim(sAmount, " "), 64)
+	amount, err = decimal.NewFromString(strings.Trim(sAmount, " "))
 	if err != nil {
-		return "", 0, "", fmt.Errorf("%d: Could not parse amount: %s", body.n, sAmount)
+		return "", decimal.Zero, "", fmt.Errorf("%d: Could not parse amount: %s", body.n, sAmount)
 	}
 	return account, amount, comment, nil
 }
@@ -67,7 +70,7 @@ func parseTransaction(lines *Lines) (trn *Transaction, err error) {
 
 	body := lines.body()
 	var account string
-	var amount float64
+	var amount decimal.Decimal
 	var comment string
 	for i := 0; i < len(body); i++ {
 		account, amount, comment, err = parseBodyLine(body[i])
