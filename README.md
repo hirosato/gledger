@@ -4,7 +4,7 @@
 ![GitHub all releases](https://img.shields.io/github/downloads/hirosato/ledger/total)
 ![GitHub Release Status](https://img.shields.io/github/workflow/status/hirosato/ledger/Release?label=release)
 ![GitHub CI Status](https://img.shields.io/github/workflow/status/hirosato/ledger/ci?label=CI)
-![[Go ReportCard](https://goreportcard.com/badge/hirosato/ledger)](https://goreportcard.com/report/hirosato/ledger)
+[![Go ReportCard](https://goreportcard.com/badge/hirosato/ledger)](https://goreportcard.com/report/hirosato/ledger)
 
 # Ledger
 
