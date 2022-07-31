@@ -10,6 +10,7 @@ import (
 type TransactionItem struct {
 	Account Account
 	Amount  float64
+	Comment string
 }
 
 type Transaction struct {
@@ -47,13 +48,14 @@ func parseHeader(lines *Lines) (date time.Time, payee string, err error) {
 	return date, dateAndPayee[1], nil
 }
 
-func parseBodyLine(body Line) (account string, amount float64, currency string, err error) {
-	accountAndAmount := strings.Split(strings.TrimLeft(body.s, " "), " ")
-	amount, err = strconv.ParseFloat(accountAndAmount[1], 64)
+func parseBodyLine(body Line) (account string, amount float64, comment string, err error) {
+	accountAndAmount, comment, _ := strings.Cut(body.s, ";")
+	account, sAmount, _ := strings.Cut(strings.TrimLeft(accountAndAmount, " "), "  ")
+	amount, err = strconv.ParseFloat(strings.Trim(sAmount, " "), 64)
 	if err != nil {
-		return "", 0, "", fmt.Errorf("%d: Could not parse amount: %s", body.n, accountAndAmount[1])
+		return "", 0, "", fmt.Errorf("%d: Could not parse amount: %s", body.n, sAmount)
 	}
-	return accountAndAmount[0], amount, "", nil
+	return account, amount, comment, nil
 }
 
 func parseTransaction(lines *Lines) (trn *Transaction, err error) {
@@ -66,12 +68,13 @@ func parseTransaction(lines *Lines) (trn *Transaction, err error) {
 	body := lines.body()
 	var account string
 	var amount float64
+	var comment string
 	for i := 0; i < len(body); i++ {
-		account, amount, _, err = parseBodyLine(body[i])
+		account, amount, comment, err = parseBodyLine(body[i])
 		if err != nil {
 			return nil, err
 		}
-		trn.Items = append(trn.Items, TransactionItem{Account: Account(account), Amount: amount})
+		trn.Items = append(trn.Items, TransactionItem{Account: Account(account), Amount: amount, Comment: comment})
 	}
 	return trn, nil
 }

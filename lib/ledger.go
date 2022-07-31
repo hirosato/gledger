@@ -22,10 +22,14 @@ func whatIsThisLine(line string) linekind {
 	if len(line) == 0 {
 		return empty
 	}
-	char := string([]rune(line)[0])
 
+	char := string([]rune(line)[0])
 	if char == ";" {
 		return comment
+	}
+
+	if char == " " {
+		return space
 	}
 
 	_, err := strconv.Atoi(char)
@@ -51,7 +55,6 @@ func ParseLedger(reader io.Reader) (trns []*Transaction, err error) {
 
 		switch whatIsThisLine(line.s) {
 		case num: //start of a transaction
-			// fmt.Println("n:", n)
 			if len(lines) > 0 {
 				trn, err = parseTransaction(&lines)
 				if err != nil {
