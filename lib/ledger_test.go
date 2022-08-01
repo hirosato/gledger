@@ -10,7 +10,7 @@ import (
 func TestLedger(t *testing.T) {
 	testLedger := bytes.NewBufferString(`
 ; Comment
-1970-01-01 Payee
+1970/01/01 Payee
   Expense:Food  100
   Assets:Cash  -100
 1970-01-02 Payee
