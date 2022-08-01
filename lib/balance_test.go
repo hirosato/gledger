@@ -17,8 +17,8 @@ func TestBalance(t *testing.T) {
   Expense:その他  100
   Assets:Cash  -100
 1970/01/01 Payee
-  Assets:Fixed Asset  100
-  Assets:Cash  -100
+  Assets:Fixed Asset  1000
+  Assets:Cash  -1000
 `)
 	ledgers, _ := ledger.ParseLedger(testLedger)
 	balances, _ := ledger.NewBalances(ledgers)

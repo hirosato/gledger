@@ -3,11 +3,10 @@ package ledger
 import (
 	"log"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/shopspring/decimal"
-
-	"github.com/gnue/go-disp_width"
 )
 
 type Balance struct {
@@ -22,26 +21,23 @@ type Balances struct {
 }
 
 func (balances *Balances) PrettyPrint() {
-	var accMax, amtMax, accLength, amtLength int
+	var amtMax, amtLength int
 	for i := 0; i < len(balances.Balances); i++ {
-		accLength = disp_width.Measure(string(balances.Balances[i].Account))
-		amtLength = disp_width.Measure(balances.Balances[i].Amount.String())
-		if accLength > accMax {
-			accMax = accLength
-		}
+		amtLength = len(balances.Balances[i].Amount.String())
 		if amtLength > amtMax {
 			amtMax = amtLength
 		}
 	}
 	for i := 0; i < len(balances.Balances); i++ {
-		accLength = disp_width.Measure(string(balances.Balances[i].Account))
-		amtLength = disp_width.Measure(balances.Balances[i].Amount.String())
-		log.Printf("%s%s: %s%s", balances.Balances[i].Account, strings.Repeat(" ", accMax-accLength+3), strings.Repeat(" ", amtMax-amtLength+3), balances.Balances[i].Amount.String())
+		log.Printf("%"+strconv.Itoa(amtMax+3)+"s | %s", balances.Balances[i].Amount, balances.Balances[i].Account)
 	}
+	log.Println("--------------------")
+	log.Printf("%"+strconv.Itoa(amtMax+3)+"s", balances.Sum.String())
+
 }
 
-func toMap(trns []*Transaction) map[string]decimal.Decimal {
-	accToAmt := make(map[string]decimal.Decimal)
+func toMap(trns []*Transaction) (accToAmt map[string]decimal.Decimal, sum decimal.Decimal) {
+	accToAmt = make(map[string]decimal.Decimal)
 	var trnItm TransactionItem
 	var accs []string
 	var acc string
@@ -51,7 +47,6 @@ func toMap(trns []*Transaction) map[string]decimal.Decimal {
 			accs = strings.Split(string(trnItm.Account), ":")
 			acc = ""
 			for k := 0; k < len(accs); k++ {
-				// acc = strings.SplitN()[]
 				if k != 0 {
 					acc += ":"
 				}
@@ -61,15 +56,17 @@ func toMap(trns []*Transaction) map[string]decimal.Decimal {
 				} else {
 					accToAmt[acc] = value.Add(trnItm.Amount)
 				}
+				sum = sum.Add(trnItm.Amount)
 			}
 		}
 	}
-	return accToAmt
+	return accToAmt, sum
 }
 
 func NewBalances(trns []*Transaction) (balances Balances, err error) {
-	accToAmt := toMap(trns)
+	accToAmt, sum := toMap(trns)
 
+	balances.Sum = sum
 	balances.Balances = make([]*Balance, len(accToAmt))
 	count := 0
 	for acc, accBalance := range accToAmt {
