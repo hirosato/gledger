@@ -16,6 +16,11 @@ func TestBalance(t *testing.T) {
 1970/01/01 Payee
   Expense:その他  100
   Assets:Cash  -100
+
+1970/01/01 Payee
+  Expense:その他  100
+  Assets:Cash  -100
+
 1970/01/01 Payee
   Assets:Fixed Asset  1000
   Assets:Cash  -1000

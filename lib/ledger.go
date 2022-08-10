@@ -4,16 +4,17 @@ import (
 	"bufio"
 	"io"
 	"strconv"
+	"strings"
 )
 
 type linekind int
 
 const (
-	num     = iota
-	empty   = iota
-	comment = iota
-	space   = iota
-	unknown = iota
+	num      = iota
+	empty    = iota
+	comment  = iota
+	indented = iota
+	unknown  = iota
 )
 
 func whatIsThisLine(line string) linekind {
@@ -22,12 +23,17 @@ func whatIsThisLine(line string) linekind {
 	}
 
 	char := string([]rune(line)[0])
+	trim := strings.Trim(line, " ")
 	if char == ";" {
 		return comment
 	}
 
+	if trim == "" {
+		return empty
+	}
+
 	if char == " " {
-		return space
+		return indented
 	}
 
 	_, err := strconv.Atoi(char)
@@ -64,7 +70,7 @@ func ParseLedger(reader io.Reader) (trns []*Transaction, err error) {
 
 		case empty, comment:
 
-		case space: // there should be account and amount in this line
+		case indented: // there should be account and amount in this line
 			lines = append(lines, line)
 		}
 
