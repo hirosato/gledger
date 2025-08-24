@@ -132,7 +132,7 @@ func (j *Journal) GetAccount(name string) (*domain.Account, bool) {
 	return account, exists
 }
 
-// GetBalance calculates the balance for an account
+// GetBalance calculates the balance for an account (includes sub-accounts)
 func (j *Journal) GetBalance(accountName string) *domain.Balance {
 	balance := domain.NewBalance()
 	
@@ -141,6 +141,26 @@ func (j *Journal) GetBalance(accountName string) *domain.Balance {
 			if posting.Account != nil {
 				accountFullName := posting.Account.FullName
 				if accountFullName == accountName || strings.HasPrefix(accountFullName, accountName+":") {
+					if posting.Amount != nil {
+						balance.Add(posting.Amount)
+					}
+				}
+			}
+		}
+	}
+	
+	return balance
+}
+
+// GetLeafBalance calculates the balance for an account (excludes sub-accounts)
+func (j *Journal) GetLeafBalance(accountName string) *domain.Balance {
+	balance := domain.NewBalance()
+	
+	for _, tx := range j.transactions {
+		for _, posting := range tx.Postings {
+			if posting.Account != nil {
+				accountFullName := posting.Account.FullName
+				if accountFullName == accountName {
 					if posting.Amount != nil {
 						balance.Add(posting.Amount)
 					}

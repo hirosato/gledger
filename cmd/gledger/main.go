@@ -92,8 +92,11 @@ func main() {
 		}
 	
 	case "balance", "bal":
-		fmt.Println("Balance command not yet implemented")
-		os.Exit(1)
+		cmd := commands.NewBalanceCommand(journal)
+		if err := cmd.Execute(commandArgs); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
 	
 	case "register", "reg":
 		fmt.Println("Register command not yet implemented")
