@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/hirosato/gledger/domain"
-	"github.com/hirosato/gledger/infrastructure/parser"
+	"github.com/hirosato/gledger/domain/ports"
 )
 
 // Journal represents a complete ledger journal with all transactions and accounts
@@ -18,29 +18,35 @@ type Journal struct {
 	directives        []domain.Directive
 	commodityRegistry map[string]*domain.Commodity
 	defaultCommodity  *domain.Commodity
+	parser            ports.Parser
 }
 
-// NewJournal creates a new empty journal
-func NewJournal() *Journal {
+// NewJournal creates a new empty journal with injected dependencies
+func NewJournal(parser ports.Parser) *Journal {
 	return &Journal{
 		transactions:      []domain.Transaction{},
 		accounts:          make(map[string]*domain.Account),
 		accountTree:       NewAccountTree(),
 		directives:        []domain.Directive{},
 		commodityRegistry: make(map[string]*domain.Commodity),
+		parser:            parser,
 	}
 }
 
 // LoadFromReader loads journal data from an io.Reader
 func (j *Journal) LoadFromReader(reader io.Reader) error {
-	p := parser.NewParser()
+	if j.parser == nil {
+		return fmt.Errorf("parser not initialized")
+	}
 	
-	if err := p.Parse(reader); err != nil {
+	transactions, directives, err := j.parser.Parse(reader)
+	if err != nil {
 		return fmt.Errorf("failed to parse journal: %w", err)
 	}
 
-	// Get parsed transactions
-	j.transactions = p.GetTransactions()
+	// Store parsed data
+	j.transactions = transactions
+	j.directives = directives
 
 	// Build account tree from transactions
 	for _, tx := range j.transactions {

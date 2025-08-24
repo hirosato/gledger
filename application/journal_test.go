@@ -3,10 +3,13 @@ package application
 import (
 	"strings"
 	"testing"
+
+	"github.com/hirosato/gledger/adapters/outbound/filesystem"
 )
 
 func TestJournalBasicFunctionality(t *testing.T) {
-	journal := NewJournal()
+	parser := filesystem.NewParserAdapter()
+	journal := NewJournal(parser)
 	
 	if journal == nil {
 		t.Fatal("Failed to create new journal")
@@ -25,7 +28,8 @@ func TestJournalBasicFunctionality(t *testing.T) {
 }
 
 func TestJournalLoadFromReader(t *testing.T) {
-	journal := NewJournal()
+	parser := filesystem.NewParserAdapter()
+	journal := NewJournal(parser)
 	
 	input := `2011-01-01 * Opening balance
     Assets:Cash                    10.00 USD
@@ -75,7 +79,8 @@ func TestJournalLoadFromReader(t *testing.T) {
 }
 
 func TestJournalAccountsMatching(t *testing.T) {
-	journal := NewJournal()
+	parser := filesystem.NewParserAdapter()
+	journal := NewJournal(parser)
 	
 	input := `2011-01-01 * Test
     Assets:Cash                    10.00 USD

@@ -6,8 +6,9 @@ import (
 	"os"
 	"strings"
 
+	"github.com/hirosato/gledger/adapters/inbound/cli/commands"
+	"github.com/hirosato/gledger/adapters/outbound/filesystem"
 	"github.com/hirosato/gledger/application"
-	"github.com/hirosato/gledger/interfaces/cli/commands"
 )
 
 const version = "0.1.0-alpha"
@@ -71,8 +72,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Create and load journal
-	journal := application.NewJournal()
+	// Create dependencies
+	parser := filesystem.NewParserAdapter()
+	
+	// Create and load journal with injected dependencies
+	journal := application.NewJournal(parser)
 	if err := journal.LoadFromReader(inputFile); err != nil {
 		fmt.Fprintf(os.Stderr, "Error parsing journal: %v\n", err)
 		os.Exit(1)
