@@ -1,0 +1,7 @@
+2011-01-01 * Opening balance
+    Assets:Bank                    10.00 GBP
+    Equity:Opening balance
+
+2012-01-02 * Transfer
+    Assets:Cash                     5.00 GBP
+    Assets:Bank                    -5.00 GBP

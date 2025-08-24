@@ -4,7 +4,9 @@ This directory contains all test files and test infrastructure.
 
 ## Structure
 
-- **fixtures/**: Test data files from original ledger suite
+- **fixtures/**: Test data files - ledger journal files for testing
+  - `simple.ledger`: Basic test data with two transactions
+  - `accounts_test.ledger`: Sample data for accounts command testing (extracted from baseline)
 - **specs/**: Test specifications extracted from original tests
 - **integration/**: End-to-end tests comparing with ledger-cli
 - **unit/**: Unit tests for individual components
@@ -33,4 +35,15 @@ make test-compare
 
 # Run specific test suite
 go test ./test/unit/...
+
+# Test with fixtures
+./build/gledger -f test/fixtures/simple.ledger accounts
+./build/gledger -f test/fixtures/accounts_test.ledger accounts
 ```
+
+## Test Data Management
+
+- **Do not commit temporary test files to project root**
+- **Use `test/fixtures/` for reusable test data**
+- **Clean up temporary files after use**
+- Test data files should be meaningful and documented

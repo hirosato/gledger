@@ -13,9 +13,10 @@ const (
 )
 
 type BalanceAssertion struct {
-	Amount    *Amount
-	Date      *time.Time
-	Inclusive bool
+	Amount       *Amount
+	Date         *time.Time
+	Inclusive    bool
+	IsAssignment bool // true for =, false for ==
 }
 
 type CostBasis struct {
@@ -25,11 +26,16 @@ type CostBasis struct {
 	PerUnitAmount *Amount
 }
 
+type PriceSpec struct {
+	Amount  *Amount
+	IsTotal bool // true for @@, false for @
+}
+
 type Posting struct {
 	Account          *Account
 	Amount           *Amount
 	Cost             *CostBasis
-	Price            *Amount
+	Price            *PriceSpec  // Changed from *Amount
 	BalanceAssertion *BalanceAssertion
 	Note             string
 	Metadata         map[string]string
@@ -54,8 +60,15 @@ func (p *Posting) SetCost(cost *CostBasis) {
 	p.Cost = cost
 }
 
-func (p *Posting) SetPrice(price *Amount) {
+func (p *Posting) SetPrice(price *PriceSpec) {
 	p.Price = price
+}
+
+func (p *Posting) SetPriceAmount(amount *Amount, isTotal bool) {
+	p.Price = &PriceSpec{
+		Amount:  amount,
+		IsTotal: isTotal,
+	}
 }
 
 func (p *Posting) SetBalanceAssertion(assertion *BalanceAssertion) {
@@ -109,8 +122,14 @@ func (p *Posting) GetDisplayAmount() *Amount {
 }
 
 func (p *Posting) GetMarketValue() *Amount {
-	if p.HasPrice() && p.Amount != nil {
-		return p.Price.Multiply(p.Amount.Number)
+	if p.HasPrice() && p.Amount != nil && p.Price != nil {
+		if p.Price.IsTotal {
+			// @@ means total price regardless of quantity
+			return p.Price.Amount.Copy()
+		} else {
+			// @ means per-unit price
+			return p.Price.Amount.Multiply(p.Amount.Number)
+		}
 	}
 	return p.Amount
 }
@@ -146,12 +165,16 @@ func (p *Posting) Copy() *Posting {
 	}
 	
 	if p.Price != nil {
-		copy.Price = p.Price.Copy()
+		copy.Price = &PriceSpec{
+			Amount:  p.Price.Amount.Copy(),
+			IsTotal: p.Price.IsTotal,
+		}
 	}
 	
 	if p.BalanceAssertion != nil {
 		assertionCopy := &BalanceAssertion{
-			Inclusive: p.BalanceAssertion.Inclusive,
+			Inclusive:    p.BalanceAssertion.Inclusive,
+			IsAssignment: p.BalanceAssertion.IsAssignment,
 		}
 		if p.BalanceAssertion.Amount != nil {
 			assertionCopy.Amount = p.BalanceAssertion.Amount.Copy()

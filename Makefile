@@ -56,7 +56,7 @@ clean:
 	@echo "$(GREEN)Clean complete$(NC)"
 
 ## test: Run all tests
-test: test-unit test-integration
+test: test-unit test-integration test-specs
 
 ## test-unit: Run unit tests
 test-unit:
