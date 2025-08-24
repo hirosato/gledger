@@ -99,8 +99,11 @@ func main() {
 		}
 	
 	case "register", "reg":
-		fmt.Println("Register command not yet implemented")
-		os.Exit(1)
+		cmd := commands.NewRegisterCommand(journal)
+		if err := cmd.Execute(commandArgs); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
 	
 	case "print":
 		fmt.Println("Print command not yet implemented")
