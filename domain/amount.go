@@ -3,7 +3,6 @@ package domain
 import (
 	"fmt"
 	"math/big"
-	"strings"
 )
 
 type Amount struct {
@@ -131,12 +130,9 @@ func (a *Amount) Format(showCommodity bool) string {
 		return numberStr
 	}
 	
-	commodityStr := a.Commodity.Symbol
-	if a.IsNegative() {
-		return "-" + commodityStr + strings.TrimPrefix(numberStr, "-")
-	}
+	// Format consistently as "number commodity"
 	
-	return commodityStr + numberStr
+	return numberStr + " " + a.Commodity.Symbol
 }
 
 func (a *Amount) formatNumber() string {

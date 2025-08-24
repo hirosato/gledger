@@ -102,7 +102,7 @@ func main() {
 			os.Exit(1)
 		}
 	
-	case "register", "reg":
+	case "register", "reg", "r":
 		cmd := commands.NewRegisterCommand(journal)
 		if err := cmd.Execute(commandArgs); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)

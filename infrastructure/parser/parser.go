@@ -220,7 +220,7 @@ func (p *Parser) parsePosting() (*domain.Posting, error) {
 	// Parse amount if present
 	var amount *domain.Amount
 	if amountStr != "" {
-		parsedAmount, err := p.parseAmount(amountStr)
+		parsedAmount, _, err := p.parseAmountWithPrice(amountStr)
 		if err == nil {
 			amount = parsedAmount
 		}
@@ -228,6 +228,14 @@ func (p *Parser) parsePosting() (*domain.Posting, error) {
 
 	posting := domain.NewPosting(account)
 	posting.Amount = amount
+
+	// Set price if present
+	if amountStr != "" {
+		_, parsedPrice, err := p.parseAmountWithPrice(amountStr)
+		if err == nil && parsedPrice != nil {
+			posting.SetPrice(parsedPrice)
+		}
+	}
 
 	return posting, nil
 }
@@ -270,6 +278,16 @@ func (p *Parser) parseAmount(amountStr string) (*domain.Amount, error) {
 
 	// Create commodity
 	commodity := domain.NewCommodity(commoditySymbol)
+
+	// Set precision based on the input format
+	if strings.Contains(valueStr, ".") {
+		// Has decimal point, set precision to number of decimal places
+		decimalPart := strings.Split(valueStr, ".")[1]
+		commodity.Precision = len(decimalPart)
+	} else {
+		// Integer amount, set precision to 0 for cleaner display
+		commodity.Precision = 0
+	}
 	
 	// Create amount
 	return domain.NewAmountFromFloat(value, commodity), nil
@@ -340,4 +358,56 @@ func (p *Parser) GetAccounts() []string {
 		accounts = append(accounts, account)
 	}
 	return accounts
+}
+// parseAmountWithPrice parses an amount string with optional price specification
+// Examples: "10.00 GBP", "1 AAA @ 10.00 GBP", "12.00 EUR @@ 10.00 GBP"
+func (p *Parser) parseAmountWithPrice(amountStr string) (*domain.Amount, *domain.PriceSpec, error) {
+	amountStr = strings.TrimSpace(amountStr)
+	
+	// Look for @@ first (total price)
+	if idx := strings.Index(amountStr, "@@"); idx > 0 {
+		amountPart := strings.TrimSpace(amountStr[:idx])
+		pricePart := strings.TrimSpace(amountStr[idx+2:])
+		
+		amount, err := p.parseAmount(amountPart)
+		if err != nil {
+			return nil, nil, err
+		}
+		
+		price, err := p.parseAmount(pricePart)
+		if err != nil {
+			return nil, nil, err
+		}
+		
+		priceSpec := &domain.PriceSpec{
+			Amount:  price,
+			IsTotal: true,
+		}
+		
+		return amount, priceSpec, nil
+	} else if idx := strings.Index(amountStr, "@"); idx > 0 {
+		amountPart := strings.TrimSpace(amountStr[:idx])
+		pricePart := strings.TrimSpace(amountStr[idx+1:])
+		
+		amount, err := p.parseAmount(amountPart)
+		if err != nil {
+			return nil, nil, err
+		}
+		
+		price, err := p.parseAmount(pricePart)
+		if err != nil {
+			return nil, nil, err
+		}
+		
+		priceSpec := &domain.PriceSpec{
+			Amount:  price,
+			IsTotal: false,
+		}
+		
+		return amount, priceSpec, nil
+	} else {
+		// No price specification, just parse the amount
+		amount, err := p.parseAmount(amountStr)
+		return amount, nil, err
+	}
 }
