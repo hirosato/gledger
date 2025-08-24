@@ -78,9 +78,16 @@ test-compare: build
 	$(GOTEST) -v ./test/integration/compare/...
 
 ## test-specs: Run spec-based tests from original ledger
-test-specs:
+test-specs: build
 	@echo "$(GREEN)Running spec-based tests...$(NC)"
 	$(GOTEST) -v ./test/specs/...
+
+## test-runner: Run spec tests using test runner
+test-runner: build
+	@echo "$(GREEN)Building test runner...$(NC)"
+	$(GOBUILD) -o $(BUILD_DIR)/testrunner cmd/testrunner/main.go
+	@echo "$(GREEN)Running spec tests with test runner...$(NC)"
+	$(BUILD_DIR)/testrunner -dir ../ledger/test/baseline -list
 
 ## coverage: Run tests with coverage and display report
 coverage:
