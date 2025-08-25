@@ -48,11 +48,15 @@ func (j *Journal) LoadFromReader(reader io.Reader) error {
 	j.transactions = transactions
 	j.directives = directives
 
-	// Build account tree from transactions
+	// Build account tree and commodity registry from transactions
 	for _, tx := range j.transactions {
 		for _, posting := range tx.Postings {
 			if posting.Account != nil {
 				j.registerAccount(posting.Account.FullName)
+			}
+			// Register commodity from amount
+			if posting.Amount != nil && posting.Amount.Commodity != nil {
+				j.RegisterCommodity(posting.Amount.Commodity)
 			}
 		}
 	}
@@ -238,6 +242,35 @@ func (j *Journal) GetCommodities() []string {
 	return commodities
 }
 
+// GetCommoditiesForAccount returns commodities used in transactions affecting the given account
+func (j *Journal) GetCommoditiesForAccount(accountPattern string) []string {
+	commoditySet := make(map[string]bool)
+	
+	for _, tx := range j.transactions {
+		for _, posting := range tx.Postings {
+			// Check if this posting affects an account matching the pattern
+			if posting.Account != nil && j.matchesAccountPattern(posting.Account.FullName, accountPattern) {
+				// Add the commodity from this posting
+				if posting.Amount != nil && posting.Amount.Commodity != nil {
+					commoditySet[posting.Amount.Commodity.Symbol] = true
+				}
+			}
+		}
+	}
+	
+	var commodities []string
+	for symbol := range commoditySet {
+		commodities = append(commodities, symbol)
+	}
+	sort.Strings(commodities)
+	return commodities
+}
+
+// matchesAccountPattern checks if an account name matches the pattern (simple substring match for now)
+func (j *Journal) matchesAccountPattern(accountName, pattern string) bool {
+	return strings.Contains(strings.ToLower(accountName), strings.ToLower(pattern))
+}
+
 // SetDefaultCommodity sets the default commodity
 func (j *Journal) SetDefaultCommodity(commodity *domain.Commodity) {
 	j.defaultCommodity = commodity
@@ -246,4 +279,44 @@ func (j *Journal) SetDefaultCommodity(commodity *domain.Commodity) {
 // GetDefaultCommodity returns the default commodity
 func (j *Journal) GetDefaultCommodity() *domain.Commodity {
 	return j.defaultCommodity
+}
+
+// GetPayees returns all unique payees from transactions
+func (j *Journal) GetPayees() []string {
+	payeeSet := make(map[string]bool)
+	
+	for _, tx := range j.transactions {
+		if tx.Payee != "" {
+			payeeSet[tx.Payee] = true
+		}
+	}
+	
+	var payees []string
+	for payee := range payeeSet {
+		payees = append(payees, payee)
+	}
+	sort.Strings(payees)
+	return payees
+}
+
+// GetPayeesMatching returns payees matching the given pattern
+func (j *Journal) GetPayeesMatching(pattern string) []string {
+	var matches []string
+	pattern = strings.ToLower(pattern)
+	
+	payeeSet := make(map[string]bool)
+	for _, tx := range j.transactions {
+		if tx.Payee != "" {
+			payeeLower := strings.ToLower(tx.Payee)
+			if strings.Contains(payeeLower, pattern) {
+				payeeSet[tx.Payee] = true
+			}
+		}
+	}
+	
+	for payee := range payeeSet {
+		matches = append(matches, payee)
+	}
+	sort.Strings(matches)
+	return matches
 }

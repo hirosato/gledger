@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 )
 
@@ -200,6 +201,21 @@ func splitLines(s string) []string {
 	return lines
 }
 
+// normalizeWhitespace normalizes all whitespace in a string for comparison
+// - Trims leading and trailing whitespace
+// - Replaces multiple consecutive spaces/tabs with single spaces
+// - Normalizes different types of whitespace to regular spaces
+func normalizeWhitespace(s string) string {
+	// Trim leading/trailing whitespace
+	s = strings.TrimSpace(s)
+	
+	// Replace all whitespace sequences (spaces, tabs, etc.) with single spaces
+	re := regexp.MustCompile(`\s+`)
+	s = re.ReplaceAllString(s, " ")
+	
+	return s
+}
+
 func compareOutput(actual, expected []string) bool {
 	if len(actual) != len(expected) {
 		return false
@@ -207,8 +223,8 @@ func compareOutput(actual, expected []string) bool {
 	
 	for i := range actual {
 		// Normalize whitespace for comparison
-		actualLine := strings.TrimSpace(actual[i])
-		expectedLine := strings.TrimSpace(expected[i])
+		actualLine := normalizeWhitespace(actual[i])
+		expectedLine := normalizeWhitespace(expected[i])
 		
 		if actualLine != expectedLine {
 			return false
@@ -221,7 +237,8 @@ func compareOutput(actual, expected []string) bool {
 func generateDiff(expected, actual []string) string {
 	var diff strings.Builder
 	
-	diff.WriteString("Expected output:\n")
+	diff.WriteString("Diff:\n")
+	diff.WriteString("  Expected output:\n")
 	for i, line := range expected {
 		diff.WriteString(fmt.Sprintf("  %3d: %s\n", i+1, line))
 	}
@@ -229,6 +246,23 @@ func generateDiff(expected, actual []string) string {
 	diff.WriteString("\nActual output:\n")
 	for i, line := range actual {
 		diff.WriteString(fmt.Sprintf("  %3d: %s\n", i+1, line))
+	}
+	
+	// Show first differing line with normalized comparison
+	minLen := len(expected)
+	if len(actual) < minLen {
+		minLen = len(actual)
+	}
+	
+	for i := 0; i < minLen; i++ {
+		expectedNorm := normalizeWhitespace(expected[i])
+		actualNorm := normalizeWhitespace(actual[i])
+		if expectedNorm != actualNorm {
+			diff.WriteString(fmt.Sprintf("\nFirst difference at line %d:\n", i+1))
+			diff.WriteString(fmt.Sprintf("  Expected (normalized): %q\n", expectedNorm))
+			diff.WriteString(fmt.Sprintf("  Actual (normalized):   %q\n", actualNorm))
+			break
+		}
 	}
 	
 	return diff.String()

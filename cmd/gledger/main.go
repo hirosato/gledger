@@ -116,6 +116,27 @@ func main() {
 			os.Exit(1)
 		}
 	
+	case "payees":
+		cmd := commands.NewPayeesCommand(journal)
+		if err := cmd.Execute(commandArgs); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+	
+	case "commodities":
+		cmd := commands.NewCommoditiesCommand(journal)
+		if err := cmd.Execute(commandArgs); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+	
+	case "stats":
+		cmd := commands.NewStatsCommand(journal)
+		if err := cmd.Execute(commandArgs); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+	
 	default:
 		fmt.Fprintf(os.Stderr, "Unknown command: %s\n", command)
 		fmt.Println("Run 'gledger --help' for usage information")

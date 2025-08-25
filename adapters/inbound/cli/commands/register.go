@@ -10,6 +10,24 @@ import (
 	"github.com/hirosato/gledger/domain"
 )
 
+// RegisterFormat defines the formatting constants for register output
+type RegisterFormat struct {
+	DateWidth        int
+	DescriptionWidth int  
+	AccountWidth     int
+	AmountWidth      int
+	BalanceWidth     int
+}
+
+// DefaultRegisterFormat provides the default column widths
+var DefaultRegisterFormat = RegisterFormat{
+	DateWidth:        9,   // "12-Jan-10" format
+	DescriptionWidth: 21,  // Payee description
+	AccountWidth:     22,  // Account name
+	AmountWidth:      12,  // Amount column  
+	BalanceWidth:     12,  // Running balance column
+}
+
 // RegisterOptions represents options for the register command
 type RegisterOptions struct {
 	AccountFilter string // Account pattern filter (e.g., :inve for Assets:Investment)
@@ -19,13 +37,25 @@ type RegisterOptions struct {
 type RegisterCommand struct {
 	journal *application.Journal
 	options RegisterOptions
+	format  RegisterFormat
 }
 
 // NewRegisterCommand creates a new register command
 func NewRegisterCommand(journal *application.Journal) *RegisterCommand {
 	return &RegisterCommand{
 		journal: journal,
+		format:  DefaultRegisterFormat,
 	}
+}
+
+// formatString returns the printf format string for register output
+func (c *RegisterCommand) formatString() string {
+	return fmt.Sprintf("%%-%ds %%-%ds %%-%ds %%%ds %%%ds\n",
+		c.format.DateWidth,
+		c.format.DescriptionWidth, 
+		c.format.AccountWidth,
+		c.format.AmountWidth,
+		c.format.BalanceWidth)
 }
 
 // Execute runs the register command
@@ -93,7 +123,7 @@ func (c *RegisterCommand) displayTransaction(tx *domain.Transaction, runningBala
 		runningBalance.Add(first.Amount)
 		runningBalanceStr := c.formatBalance(runningBalance)
 
-		fmt.Fprintf(os.Stdout, "%-9s %-20s %-30s %12s %12s\n", 
+		fmt.Fprintf(os.Stdout, c.formatString(), 
 			dateStr, descStr, first.Account.Name, amountStr, runningBalanceStr)
 		
 		// Display additional balance lines for multi-commodity
@@ -105,7 +135,7 @@ func (c *RegisterCommand) displayTransaction(tx *domain.Transaction, runningBala
 			runningBalance.Add(posting.Amount)
 			runningBalanceStr := c.formatBalance(runningBalance)
 
-			fmt.Fprintf(os.Stdout, "%-9s %-20s %-30s %12s %12s\n", 
+			fmt.Fprintf(os.Stdout, c.formatString(), 
 				"", "", posting.Account.Name, amountStr, runningBalanceStr)
 			
 			// Display additional balance lines for multi-commodity
@@ -135,14 +165,18 @@ func (c *RegisterCommand) formatDate(date time.Time) string {
 	months := []string{"", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
 		"Jul", "Aug", "Sep", "Oct", "Nov", "Dec"}
 	
-	year := date.Year() % 100 // Last two digits
+	const yearDigits = 100 // For 2-digit year format (year % 100)
+	year := date.Year() % yearDigits
 	return fmt.Sprintf("%02d-%s-%02d", year, months[date.Month()], date.Day())
 }
 
-// formatDescription formats a transaction description (truncated)
+// formatDescription formats a transaction description (truncated to fit width)
 func (c *RegisterCommand) formatDescription(payee string) string {
-	if len(payee) > 20 {
-		return payee[:17] + ".."
+	maxWidth := c.format.DescriptionWidth
+	if len(payee) > maxWidth {
+		// Reserve 2 characters for ".." truncation indicator
+		truncateAt := maxWidth - 2
+		return payee[:truncateAt] + ".."
 	}
 	return payee
 }
