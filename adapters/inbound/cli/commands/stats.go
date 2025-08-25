@@ -22,6 +22,27 @@ func NewStatsCommand(journal *application.Journal) *StatsCommand {
 
 // Execute runs the stats command
 func (c *StatsCommand) Execute(args []string) error {
+	// Parse command-line arguments for --now flag
+	now := time.Now()
+	
+	for i := 0; i < len(args); i++ {
+		if args[i] == "--now" && i+1 < len(args) {
+			// Parse the date string
+			dateStr := args[i+1]
+			parsedDate, err := time.Parse("2006-01-02", dateStr)
+			if err != nil {
+				// Try other date formats
+				parsedDate, err = time.Parse("2006/01/02", dateStr)
+				if err != nil {
+					return fmt.Errorf("invalid date format for --now: %s", dateStr)
+				}
+			}
+			now = parsedDate
+			// Skip the next argument as it's the date value
+			i++
+		}
+	}
+	
 	transactions := c.journal.GetTransactions()
 	
 	if len(transactions) == 0 {
@@ -65,8 +86,11 @@ func (c *StatsCommand) Execute(args []string) error {
 		}
 	}
 
-	// Calculate time period
-	days := int(latestDate.Sub(earliestDate).Hours()/24) + 1
+	// Calculate time period (number of days between dates)
+	days := int(latestDate.Sub(earliestDate).Hours() / 24)
+	if days == 0 {
+		days = 1 // Minimum of 1 day
+	}
 	postsPerDay := float64(totalPostings) / float64(days)
 
 	// Output statistics
@@ -89,7 +113,6 @@ func (c *StatsCommand) Execute(args []string) error {
 	fmt.Fprintln(os.Stdout)
 
 	// Calculate days since last post
-	now := time.Now()
 	daysSinceLastPost := int(now.Sub(latestDate).Hours() / 24)
 	fmt.Fprintf(os.Stdout, "  Days since last post:        %d\n", daysSinceLastPost)
 
