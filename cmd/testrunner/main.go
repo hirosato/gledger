@@ -23,8 +23,8 @@ func main() {
 	flag.Parse()
 
 	if *testDir == "" && *testFile == "" {
-		// Default to baseline tests
-		*testDir = "../../ledger/test/baseline"
+		// Default to local baseline tests
+		*testDir = "test/fixtures/baseline"
 	}
 
 	// Create parser

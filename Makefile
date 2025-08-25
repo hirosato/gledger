@@ -87,7 +87,7 @@ test-runner: build
 	@echo "$(GREEN)Building test runner...$(NC)"
 	$(GOBUILD) -o $(BUILD_DIR)/testrunner cmd/testrunner/main.go
 	@echo "$(GREEN)Running spec tests with test runner...$(NC)"
-	$(BUILD_DIR)/testrunner -dir ../ledger/test/baseline -list
+	$(BUILD_DIR)/testrunner -list
 
 ## coverage: Run tests with coverage and display report
 coverage:
