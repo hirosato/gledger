@@ -219,15 +219,21 @@ func (p *Parser) parsePosting() (*domain.Posting, error) {
 	
 	// Parse amount if present
 	var amount *domain.Amount
+	var expressionAmount string
 	if amountStr != "" {
 		parsedAmount, _, err := p.parseAmountWithPrice(amountStr)
 		if err == nil {
 			amount = parsedAmount
+			// Check if this was an expression amount that we couldn't fully evaluate
+			if strings.HasPrefix(strings.TrimSpace(amountStr), "(") && strings.HasSuffix(strings.TrimSpace(amountStr), ")") {
+				expressionAmount = amountStr
+			}
 		}
 	}
 
 	posting := domain.NewPosting(account)
 	posting.Amount = amount
+	posting.ExpressionAmount = expressionAmount
 
 	// Set price if present
 	if amountStr != "" {
@@ -244,28 +250,44 @@ func (p *Parser) parsePosting() (*domain.Posting, error) {
 func (p *Parser) parseAmount(amountStr string) (*domain.Amount, error) {
 	amountStr = strings.TrimSpace(amountStr)
 	
+	// Check if this is an expression amount (enclosed in parentheses)
+	if strings.HasPrefix(amountStr, "(") && strings.HasSuffix(amountStr, ")") {
+		// For now, treat expression amounts as zero amount to avoid parsing errors
+		// This allows the journal to be parsed but the expression won't be evaluated
+		// TODO: Implement full expression evaluation
+		return domain.NewAmountFromFloat(0.0, domain.NewCommodity("$")), nil
+	}
+	
 	// Handle currency symbols at the beginning
 	commoditySymbol := ""
 	valueStr := amountStr
 	
+	// Handle comma as decimal separator (for European format)
+	valueStr = strings.ReplaceAll(valueStr, ",", ".")
+	
 	if strings.HasPrefix(amountStr, "$") {
 		commoditySymbol = "$"
 		valueStr = strings.TrimSpace(amountStr[1:])
+		valueStr = strings.ReplaceAll(valueStr, ",", ".")
 	} else if strings.HasPrefix(amountStr, "£") {
 		commoditySymbol = "£"
 		valueStr = strings.TrimSpace(amountStr[1:])
+		valueStr = strings.ReplaceAll(valueStr, ",", ".")
 	} else if strings.HasPrefix(amountStr, "€") {
 		commoditySymbol = "€"
 		valueStr = strings.TrimSpace(amountStr[1:])
+		valueStr = strings.ReplaceAll(valueStr, ",", ".")
 	} else {
 		// Look for commodity at the end
 		parts := strings.Fields(amountStr)
 		if len(parts) == 2 {
 			valueStr = parts[0]
+			valueStr = strings.ReplaceAll(valueStr, ",", ".")
 			commoditySymbol = parts[1]
 		} else if len(parts) == 1 {
 			// Just a number, no commodity
 			valueStr = parts[0]
+			valueStr = strings.ReplaceAll(valueStr, ",", ".")
 			commoditySymbol = "$" // Default commodity
 		}
 	}
@@ -295,14 +317,18 @@ func (p *Parser) parseAmount(amountStr string) (*domain.Amount, error) {
 
 // applyAmountElision fills in missing amounts in postings
 func (p *Parser) applyAmountElision(transaction *domain.Transaction) error {
-	// Count postings without amounts
+	// Count postings without amounts (but don't count expression amounts)
 	var missingIndex = -1
 	missingCount := 0
+	hasExpressionAmount := false
 	
 	for i, posting := range transaction.Postings {
-		if posting.Amount == nil {
+		if posting.Amount == nil && posting.ExpressionAmount == "" {
 			missingIndex = i
 			missingCount++
+		}
+		if posting.ExpressionAmount != "" {
+			hasExpressionAmount = true
 		}
 	}
 
@@ -311,8 +337,14 @@ func (p *Parser) applyAmountElision(transaction *domain.Transaction) error {
 		return fmt.Errorf("only one posting can have an elided amount")
 	}
 
+	// If we have expression amounts, don't try to calculate elided amounts
+	// Just leave them empty to be consistent with ledger-cli behavior
+	if hasExpressionAmount && missingCount == 1 {
+		return nil
+	}
+
 	// If one amount is missing, calculate it to balance the transaction
-	if missingCount == 1 {
+	if missingCount == 1 && !hasExpressionAmount {
 		// Sum all known amounts by commodity
 		sums := make(map[string]float64)
 		commodities := make(map[string]*domain.Commodity)

@@ -41,6 +41,11 @@ Thumbs.db
 test/fixtures/*.actual
 test/fixtures/*.diff
 
+# Temporary test data files in root
+test_*.dat
+test_*.ledger
+*.dat
+
 # Local environment files
 .env
 .env.local

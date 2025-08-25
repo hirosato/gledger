@@ -19,13 +19,37 @@ type TestRunner struct {
 
 // NewTestRunner creates a new test runner
 func NewTestRunner() (*TestRunner, error) {
-	// Find gledger binary
-	gledgerPath := filepath.Join("build", "gledger")
-	if _, err := os.Stat(gledgerPath); os.IsNotExist(err) {
-		// Try to build it
+	// Find gledger binary - check multiple possible locations
+	possiblePaths := []string{
+		filepath.Join("build", "gledger"),
+		filepath.Join("..", "..", "build", "gledger"),
+		filepath.Join(".", "build", "gledger"),
+	}
+	
+	var gledgerPath string
+	for _, path := range possiblePaths {
+		if _, err := os.Stat(path); err == nil {
+			gledgerPath = path
+			break
+		}
+	}
+	
+	if gledgerPath == "" {
+		// Try to build it from the root directory
 		cmd := exec.Command("make", "build")
+		cmd.Dir = filepath.Join("..", "..")
 		if err := cmd.Run(); err != nil {
 			return nil, fmt.Errorf("failed to build gledger: %w", err)
+		}
+		// Check again
+		for _, path := range possiblePaths {
+			if _, err := os.Stat(path); err == nil {
+				gledgerPath = path
+				break
+			}
+		}
+		if gledgerPath == "" {
+			return nil, fmt.Errorf("gledger binary not found after build")
 		}
 	}
 

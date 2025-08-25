@@ -42,6 +42,7 @@ type Posting struct {
 	Transaction      *Transaction
 	Type             PostingType
 	IsGenerated      bool
+	ExpressionAmount string // Original expression if amount couldn't be evaluated
 }
 
 func NewPosting(account *Account) *Posting {

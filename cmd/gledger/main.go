@@ -137,6 +137,20 @@ func main() {
 			os.Exit(1)
 		}
 	
+	case "prices":
+		cmd := commands.NewPricesCommand(journal)
+		if err := cmd.Execute(commandArgs); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+	
+	case "equity":
+		cmd := commands.NewEquityCommand(journal)
+		if err := cmd.Execute(commandArgs); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+	
 	default:
 		fmt.Fprintf(os.Stderr, "Unknown command: %s\n", command)
 		fmt.Println("Run 'gledger --help' for usage information")
@@ -158,6 +172,8 @@ func printHelp() {
 	fmt.Println("  payees            List all payees")
 	fmt.Println("  commodities       List all commodities")
 	fmt.Println("  stats             Show journal statistics")
+	fmt.Println("  prices            Show price history")
+	fmt.Println("  equity            Generate opening balance entries")
 	fmt.Println()
 	fmt.Println("Options:")
 	fmt.Println("  -f, --file FILE   Read journal from FILE")

@@ -144,9 +144,18 @@ func (c *PrintCommand) printTransaction(tx *domain.Transaction) {
 
 // printPosting prints a single posting line
 func (c *PrintCommand) printPosting(posting *domain.Posting) {
-	if posting.Amount != nil {
+	if posting.Amount != nil || posting.ExpressionAmount != "" {
 		// Build the amount string with all components
-		amountStr := c.formatAmount(posting.Amount)
+		var amountStr string
+		if posting.ExpressionAmount != "" {
+			// Use the original expression if we have it
+			amountStr = posting.ExpressionAmount
+			if c.options.DecimalComma {
+				amountStr = strings.ReplaceAll(amountStr, ".", ",")
+			}
+		} else {
+			amountStr = c.formatAmount(posting.Amount)
+		}
 		
 		// Add cost information if present
 		if posting.HasCost() {
@@ -221,7 +230,7 @@ func (c *PrintCommand) printPosting(posting *domain.Posting) {
 			fmt.Printf("%s%s%s%s\n", postingIndentStr, accountName, strings.Repeat(" ", minSpacing), amountStr)
 		}
 	} else {
-		// No amount - just print account name
+		// No amount and no expression - just print account name
 		fmt.Printf("%s%s\n", postingIndentStr, posting.Account.Name)
 	}
 	
