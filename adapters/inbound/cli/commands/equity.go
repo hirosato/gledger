@@ -25,14 +25,46 @@ func NewEquityCommand(journal *application.Journal) *EquityCommand {
 
 // Execute runs the equity command
 func (c *EquityCommand) Execute(args []string) error {
-	// Get account pattern if provided
+	// Parse command line options
 	var accountPattern string
-	if len(args) > 0 {
-		accountPattern = args[0]
+	var showLotPrices bool
+	var showLots bool
+	var dateFormat string = "2006/01/02"
+	
+	// Process arguments
+	i := 0
+	for i < len(args) {
+		arg := args[i]
+		if arg == "--lot-prices" {
+			showLotPrices = true
+			i++
+		} else if arg == "--lots" {
+			showLots = true
+			i++
+		} else if arg == "--date-format" && i+1 < len(args) {
+			i++
+			// Convert ledger date format to Go format
+			dateFormat = convertDateFormat(args[i])
+			i++
+		} else if !strings.HasPrefix(arg, "-") {
+			// This is the account pattern
+			accountPattern = arg
+			i++
+		} else {
+			i++
+		}
 	}
 
+	// Structure to track lots when needed
+	type lot struct {
+		amount    *domain.Amount
+		price     *domain.Amount
+		date      time.Time
+	}
+	
 	// Calculate balances for all accounts
 	balances := make(map[string]*domain.Balance)
+	accountLots := make(map[string][]lot) // Track lots per account if needed
 	
 	for _, tx := range c.journal.GetTransactions() {
 		for _, posting := range tx.Postings {
@@ -48,7 +80,19 @@ func (c *EquityCommand) Execute(args []string) error {
 				if balances[accountName] == nil {
 					balances[accountName] = domain.NewBalance()
 				}
-				balances[accountName].Add(posting.Amount)
+				
+				// If we're showing lot prices or lots, track each lot separately for price specs
+				if (showLotPrices || showLots) && posting.HasPrice() {
+					// Store lot information
+					accountLots[accountName] = append(accountLots[accountName], lot{
+						amount: posting.Amount,
+						price:  posting.Price.Amount,
+						date:   tx.Date,
+					})
+				} else {
+					// Normal balance tracking for all accounts
+					balances[accountName].Add(posting.Amount)
+				}
 			}
 		}
 	}
@@ -78,55 +122,121 @@ func (c *EquityCommand) Execute(args []string) error {
 	
 	// First print all regular account balances
 	for _, account := range accounts {
-		balance := balances[account]
-		for _, amount := range balance.GetAmounts() {
-			if !amount.IsZero() {
-				// Format the amount
-				amountStr := c.formatAmount(amount)
-				// Calculate spacing
-				spacing := 59 - len(account) - len(amountStr)
-				if spacing < 2 {
-					spacing = 2
+		// Check if we have lots for this account
+		if lots, hasLots := accountLots[account]; hasLots && (showLotPrices || showLots) {
+			// Print each lot separately
+			for _, lot := range lots {
+				amountStr := c.formatAmount(lot.amount)
+				
+				// Add lot price if requested (lots also include prices)
+				if showLotPrices || showLots {
+					priceStr := c.formatAmount(lot.price)
+					amountStr = fmt.Sprintf("%s {%s}", amountStr, priceStr)
 				}
-				fmt.Fprintf(os.Stdout, "    %s%*s\n", account, spacing, amountStr)
+				
+				// Add lot date if requested
+				if showLots {
+					dateStr := lot.date.Format(dateFormat)
+					amountStr = fmt.Sprintf("%s [%s]", amountStr, dateStr)
+				}
+				
+				// Use right-aligned formatting with fixed width
+				fmt.Fprintf(os.Stdout, "    %-27s%32s\n", account, amountStr)
+			}
+		} else {
+			// Regular balance output
+			balance := balances[account]
+			for _, amount := range balance.GetAmounts() {
+				if !amount.IsZero() {
+					// Format the amount
+					amountStr := c.formatAmount(amount)
+					// Use right-aligned formatting with fixed width
+					fmt.Fprintf(os.Stdout, "    %-27s%32s\n", account, amountStr)
+				}
 			}
 		}
 	}
+	
+	// Check if we're filtering to a specific account pattern
+	// If we have exactly one commodity in the filtered results, we can elide the equity amount
+	totalCommodities := 0
+	for _, balance := range balances {
+		totalCommodities += len(balance.GetAmounts())
+	}
+	
+	shouldElideEquity := accountPattern != "" && totalCommodities == 1
 	
 	// Then print the offsetting Equity:Opening Balances entries
-	// First collect all equity entries
-	type equityEntry struct {
-		amount *domain.Amount
-		text   string
-	}
-	var equityEntries []equityEntry
-	
-	for _, account := range accounts {
-		balance := balances[account]
-		for _, amount := range balance.GetAmounts() {
-			if !amount.IsZero() {
-				// Negate the amount for equity account
-				negatedAmount := amount.Negate()
-				amountStr := c.formatAmount(negatedAmount)
-				equityAccount := "Equity:Opening Balances"
-				spacing := 59 - len(equityAccount) - len(amountStr)
-				if spacing < 2 {
-					spacing = 2
+	if shouldElideEquity {
+		// When filtering to a single account with one commodity, elide the amount
+		fmt.Fprintf(os.Stdout, "    Equity:Opening Balances\n")
+	} else {
+		// First collect all equity entries
+		type equityEntry struct {
+			amount *domain.Amount
+			text   string
+		}
+		var equityEntries []equityEntry
+		
+		// Track GBP totals when showing lots
+		totalGBP := 0.0
+		
+		for _, account := range accounts {
+			// Handle lots for equity entries
+			if lots, hasLots := accountLots[account]; hasLots && (showLotPrices || showLots) {
+				for _, lot := range lots {
+					// Negate the amount for equity account
+					negatedAmount := lot.amount.Negate()
+					amountStr := c.formatAmount(negatedAmount)
+					
+					// Add lot price if requested (lots also include prices)
+					if showLotPrices || showLots {
+						priceStr := c.formatAmount(lot.price)
+						amountStr = fmt.Sprintf("%s {%s}", amountStr, priceStr)
+					}
+					
+					// Add lot date if requested
+					if showLots {
+						dateStr := lot.date.Format(dateFormat)
+						amountStr = fmt.Sprintf("%s [%s]", amountStr, dateStr)
+					}
+					
+					// Track GBP total for final equity entry
+					marketValue := lot.price.ToFloat64() * lot.amount.ToFloat64()
+					totalGBP += marketValue
+					
+					equityAccount := "Equity:Opening Balances"
+					text := fmt.Sprintf("    %-27s%32s\n", equityAccount, amountStr)
+					equityEntries = append(equityEntries, equityEntry{negatedAmount, text})
 				}
-				text := fmt.Sprintf("    %s%*s\n", equityAccount, spacing, amountStr)
-				equityEntries = append(equityEntries, equityEntry{negatedAmount, text})
+			} else {
+				// Regular balance entries
+				balance := balances[account]
+				for _, amount := range balance.GetAmounts() {
+					if !amount.IsZero() {
+						// Negate the amount for equity account
+						negatedAmount := amount.Negate()
+						amountStr := c.formatAmount(negatedAmount)
+						equityAccount := "Equity:Opening Balances"
+						text := fmt.Sprintf("    %-27s%32s\n", equityAccount, amountStr)
+						equityEntries = append(equityEntries, equityEntry{negatedAmount, text})
+					}
+				}
 			}
 		}
-	}
-	
-	// Sort equity entries: negative amounts first
-	sort.Slice(equityEntries, func(i, j int) bool {
-		return equityEntries[i].amount.ToFloat64() < equityEntries[j].amount.ToFloat64()
-	})
-	
-	// Print sorted equity entries
-	for _, entry := range equityEntries {
-		fmt.Fprint(os.Stdout, entry.text)
+		
+		// Note: We don't add the GBP equity entry here because it comes from the regular balances
+		// The Assets:Bank account balance provides the GBP offset
+		
+		// Sort equity entries: negative amounts first
+		sort.Slice(equityEntries, func(i, j int) bool {
+			return equityEntries[i].amount.ToFloat64() < equityEntries[j].amount.ToFloat64()
+		})
+		
+		// Print sorted equity entries
+		for _, entry := range equityEntries {
+			fmt.Fprint(os.Stdout, entry.text)
+		}
 	}
 	
 	return nil
@@ -138,19 +248,25 @@ func (c *EquityCommand) formatAmount(amount *domain.Amount) string {
 	var numberStr string
 	floatVal := amount.ToFloat64()
 	
-	// Check if it's a whole number
-	if floatVal == float64(int(floatVal)) {
-		numberStr = fmt.Sprintf("%d", int(floatVal))
-	} else {
-		// Use precision from commodity or default to 2
-		precision := 2
-		if amount.Commodity != nil && amount.Commodity.Precision > 0 {
-			precision = amount.Commodity.Precision
-		}
-		format := fmt.Sprintf("%%.%df", precision)
-		numberStr = fmt.Sprintf(format, floatVal)
+	// Use precision from commodity or default to 2
+	precision := 2
+	if amount.Commodity != nil && amount.Commodity.Precision >= 0 {
+		precision = amount.Commodity.Precision
 	}
+	
+	// Always use the precision for consistency with ledger-cli
+	format := fmt.Sprintf("%%.%df", precision)
+	numberStr = fmt.Sprintf(format, floatVal)
 	
 	// Add commodity
 	return numberStr + " " + amount.Commodity.Symbol
+}
+
+// convertDateFormat converts ledger date format to Go date format
+func convertDateFormat(ledgerFormat string) string {
+	// Simple conversion - extend as needed
+	goFormat := strings.ReplaceAll(ledgerFormat, "%Y", "2006")
+	goFormat = strings.ReplaceAll(goFormat, "%m", "01")
+	goFormat = strings.ReplaceAll(goFormat, "%d", "02")
+	return goFormat
 }
