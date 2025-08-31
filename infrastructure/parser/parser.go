@@ -346,17 +346,28 @@ func (p *Parser) applyAmountElision(transaction *domain.Transaction) error {
 	// If one amount is missing, calculate it to balance the transaction
 	if missingCount == 1 && !hasExpressionAmount {
 		// Sum all known amounts by commodity
+		// When there are price specs, we need to use market values
 		sums := make(map[string]float64)
 		commodities := make(map[string]*domain.Commodity)
 		
 		for i, posting := range transaction.Postings {
-			if i != missingIndex && posting.Amount != nil {
-				commoditySymbol := posting.Amount.Commodity.Symbol
-				if commoditySymbol == "" {
-					commoditySymbol = "$" // Default commodity
+			if i != missingIndex {
+				// Use market value if price spec exists, otherwise use amount
+				var valueToSum *domain.Amount
+				if posting.HasPrice() && posting.Amount != nil {
+					valueToSum = posting.GetMarketValue()
+				} else if posting.Amount != nil {
+					valueToSum = posting.Amount
 				}
-				sums[commoditySymbol] += posting.Amount.ToFloat64()
-				commodities[commoditySymbol] = posting.Amount.Commodity
+				
+				if valueToSum != nil {
+					commoditySymbol := valueToSum.Commodity.Symbol
+					if commoditySymbol == "" {
+						commoditySymbol = "$" // Default commodity
+					}
+					sums[commoditySymbol] += valueToSum.ToFloat64()
+					commodities[commoditySymbol] = valueToSum.Commodity
+				}
 			}
 		}
 

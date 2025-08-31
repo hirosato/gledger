@@ -43,6 +43,7 @@ func (c *EquityCommand) Execute(args []string) error {
 				continue
 			}
 			
+			// For equity, we track the actual commodity amounts
 			if posting.Amount != nil {
 				if balances[accountName] == nil {
 					balances[accountName] = domain.NewBalance()
@@ -93,6 +94,13 @@ func (c *EquityCommand) Execute(args []string) error {
 	}
 	
 	// Then print the offsetting Equity:Opening Balances entries
+	// First collect all equity entries
+	type equityEntry struct {
+		amount *domain.Amount
+		text   string
+	}
+	var equityEntries []equityEntry
+	
 	for _, account := range accounts {
 		balance := balances[account]
 		for _, amount := range balance.GetAmounts() {
@@ -105,9 +113,20 @@ func (c *EquityCommand) Execute(args []string) error {
 				if spacing < 2 {
 					spacing = 2
 				}
-				fmt.Fprintf(os.Stdout, "    %s%*s\n", equityAccount, spacing, amountStr)
+				text := fmt.Sprintf("    %s%*s\n", equityAccount, spacing, amountStr)
+				equityEntries = append(equityEntries, equityEntry{negatedAmount, text})
 			}
 		}
+	}
+	
+	// Sort equity entries: negative amounts first
+	sort.Slice(equityEntries, func(i, j int) bool {
+		return equityEntries[i].amount.ToFloat64() < equityEntries[j].amount.ToFloat64()
+	})
+	
+	// Print sorted equity entries
+	for _, entry := range equityEntries {
+		fmt.Fprint(os.Stdout, entry.text)
 	}
 	
 	return nil
@@ -121,12 +140,15 @@ func (c *EquityCommand) formatAmount(amount *domain.Amount) string {
 	
 	// Check if it's a whole number
 	if floatVal == float64(int(floatVal)) {
-		numberStr = fmt.Sprintf("%.2f", floatVal)
+		numberStr = fmt.Sprintf("%d", int(floatVal))
 	} else {
-		// Use appropriate precision
-		numberStr = fmt.Sprintf("%.2f", floatVal)
-		// Remove trailing zeros
-		numberStr = strings.TrimRight(strings.TrimRight(numberStr, "0"), ".")
+		// Use precision from commodity or default to 2
+		precision := 2
+		if amount.Commodity != nil && amount.Commodity.Precision > 0 {
+			precision = amount.Commodity.Precision
+		}
+		format := fmt.Sprintf("%%.%df", precision)
+		numberStr = fmt.Sprintf(format, floatVal)
 	}
 	
 	// Add commodity
